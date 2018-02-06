@@ -4,7 +4,7 @@ require_relative 'queue_worker'
 
 module TaskQueue
   # A queue that executes tasks in the order in which they were received
-  class WorkQueue
+  class TaskQueue
     attr_reader :name
 
     def initialize(name:, number_of_workers: 1)

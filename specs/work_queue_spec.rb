@@ -1,13 +1,13 @@
-require_relative '../work_queue'
+require_relative '../task_queue'
 
 module TaskQueue
-  describe WorkQueue do
+  describe TaskQueue do
     def wait_for_task_to_complete(task: nil)
       sleep 0.0001 until task.completed
     end
 
     it 'Executes one block of work with just 1 worker' do
-      queue = WorkQueue.new(name: 'test queue')
+      queue = TaskQueue.new(name: 'test queue')
       work_completed = false
       task = Task.new(work_block: proc { work_completed = true })
       queue.add_task_async(task: task)
@@ -16,7 +16,7 @@ module TaskQueue
     end
 
     it 'Executes 2 blocks of work with just 1 worker' do
-      queue = WorkQueue.new(name: 'test queue')
+      queue = TaskQueue.new(name: 'test queue')
 
       work_completed1 = false
       work_completed2 = false
@@ -34,7 +34,7 @@ module TaskQueue
     end
 
     it 'Executes 2 blocks of work with 2 workers' do
-      queue = WorkQueue.new(name: 'test queue', number_of_workers: 2)
+      queue = TaskQueue.new(name: 'test queue', number_of_workers: 2)
 
       work_completed1 = false
       work_completed2 = false
@@ -52,7 +52,7 @@ module TaskQueue
     end
 
     it 'Executes 1000 blocks of work with 1 worker, in serial' do
-      queue = WorkQueue.new(name: 'test queue')
+      queue = TaskQueue.new(name: 'test queue')
 
       numbers = []
       expected_results = []
@@ -73,7 +73,7 @@ module TaskQueue
     end
 
     it 'Executes 1000 blocks of work with 10 workers' do
-      queue = WorkQueue.new(name: 'test queue', number_of_workers: 10)
+      queue = TaskQueue.new(name: 'test queue', number_of_workers: 10)
 
       numbers = []
       expected_results = []
@@ -89,7 +89,7 @@ module TaskQueue
     end
 
     it 'Executes 50 blocks of work with 2 workers' do
-      queue = WorkQueue.new(name: 'test queue', number_of_workers: 3)
+      queue = TaskQueue.new(name: 'test queue', number_of_workers: 3)
 
       numbers = []
       expected_results = []
