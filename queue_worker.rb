@@ -49,7 +49,6 @@ module TaskQueue
           @busy = false
           @current_task.completed = true
           @current_task.completed.freeze # Sorry, you can't run this task again
-          puts "Worker completed #{id}"
           @worker_delegate.worker_completed_task(worker: self)
         end
       end
