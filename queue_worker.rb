@@ -53,6 +53,8 @@ module TaskQueue
           @worker_delegate.worker_completed_task(worker: self)
         end
       end
+    ensure
+      task.ensure_block.call if task.ensure_block
     end
   end
 end
