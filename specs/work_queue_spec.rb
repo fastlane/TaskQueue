@@ -15,6 +15,29 @@ module TaskQueue
       expect(work_completed).to be(true)
     end
 
+    it 'Executes ensure block' do
+      queue = TaskQueue.new(name: 'test queue')
+      work_completed = false
+      ensured = false
+      task = Task.new(work_block: proc { work_completed = true }, ensure_block: proc { ensured = true })
+      queue.add_task_async(task: task)
+      wait_for_task_to_complete(task: task)
+      expect(work_completed).to be(true)
+      expect(ensured).to be(true)
+    end
+
+    it 'Executes ensure block on exception' do
+      ensured = false
+      expect {
+        queue = TaskQueue.new(name: 'test queue')
+        task = Task.new(work_block: proc { raise "Oh noes" }, ensure_block: proc { ensured = true })
+        queue.add_task_async(task: task)
+        wait_for_task_to_complete(task: task)
+      }.to raise_error
+
+      expect(ensured).to be(true)
+    end
+
     it 'Executes 2 blocks of work with just 1 worker' do
       queue = TaskQueue.new(name: 'test queue')
 
