@@ -1,6 +1,6 @@
-require 'set'
-require_relative 'task'
-require_relative 'queue_worker'
+require "set"
+require_relative "task"
+require_relative "queue_worker"
 
 module TaskQueue
   # A queue that executes tasks in the order in which they were received
@@ -27,7 +27,6 @@ module TaskQueue
       @worker_list_mutex.synchronize do
         # remove worker from busy list
         @busy_workers.delete(worker)
-
         # add this worker back the available worker pool
         @available_workers.add(worker)
       end
@@ -81,7 +80,7 @@ module TaskQueue
         sleep(0.0001)
       end
     rescue ex
-      puts ex
+      puts(ex)
       raise ex
     end
 
@@ -90,6 +89,16 @@ module TaskQueue
 
       @queue << task
       @task_distributor_thread.wakeup
+    end
+
+    def task_count
+      @queue.length
+    end
+
+    def busy_worker_count
+      @worker_list_mutex.synchronize do
+        return @busy_workers.count
+      end
     end
   end
 end
