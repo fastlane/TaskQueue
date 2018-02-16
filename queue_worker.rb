@@ -46,6 +46,7 @@ module TaskQueue
       ensure
         # lastly, we can finally make sure this worker gets reassigned some work
         @busy_mutex.synchronize do
+          @current_task = nil
           @worker_delegate.worker_completed_task(worker: self)
         end
       end
