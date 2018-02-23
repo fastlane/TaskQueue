@@ -81,7 +81,7 @@ module TaskQueue
           puts("Thread terminated with exception: #{e.message}")
           puts(e.backtrace.map { |line| "  #{line}" })
 
-          raise if Thread.abort_on_exception || Thread.current.abort_on_exception
+          raise e if Thread.abort_on_exception || Thread.current.abort_on_exception
         end
       end
     end
