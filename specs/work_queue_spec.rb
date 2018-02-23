@@ -33,7 +33,7 @@ module TaskQueue
         task = Task.new(work_block: proc { raise "Oh noes" }, ensure_block: proc { ensured = true })
         queue.add_task_async(task: task)
         wait_for_task_to_complete(task: task)
-      }.to raise_error
+      }.to raise_error(RuntimeError, "Oh noes")
 
       expect(ensured).to be(true)
     end

@@ -79,9 +79,9 @@ module TaskQueue
         # Spin until the start_task_distributor is in sleeping state
         sleep(0.0001)
       end
-    rescue ex
+    rescue StandardError => ex
       puts(ex)
-      raise ex
+      raise ex if Thread.abort_on_exception || Thread.current.abort_on_exception
     end
 
     def add_task_async(task:)
