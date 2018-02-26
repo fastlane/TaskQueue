@@ -8,6 +8,7 @@ module TaskQueue
     attr_accessor :ensure_block
     attr_accessor :completed
     attr_accessor :submitted
+    attr_accessor :finished_successfully
 
     def initialize(name: nil, description: nil, work_block: nil, ensure_block: nil)
       self.work_block = work_block
@@ -19,6 +20,7 @@ module TaskQueue
       self.description.freeze
       self.completed = false
       self.submitted = false
+      self.finished_successfully = false
     end
   end
 end
