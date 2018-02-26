@@ -47,6 +47,7 @@ module TaskQueue
       wait_for_task_to_complete(task: task)
       expect(work_completed).to be(true)
       expect(success_task).to be(true)
+      expect(task.finished_successfully).to be(true)
     end
 
     it 'Reports unsuccess state when task completed with exceptions' do
@@ -61,6 +62,7 @@ module TaskQueue
 
       expect(ensured).to be(true)
       expect(success_task).to be(false)
+      expect(task.finished_successfully).to be(false)
     end
 
     it 'Executes 2 blocks of work with just 1 worker' do
