@@ -45,7 +45,7 @@ module TaskQueue
             when 1
               @current_task.ensure_block.call(@current_task.finished_successfully)
             else
-              raise "Unexpected number of arguments in `ensure_block`, expected 1 or 2, got #{@current_task.ensure_block.arity}"
+              raise "Unexpected number of arguments in `ensure_block`, expected 0 or 1, got #{@current_task.ensure_block.arity}"
           end
         end
         @current_task.ensure_block.call if @current_task.ensure_block
