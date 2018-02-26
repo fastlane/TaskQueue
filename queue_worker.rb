@@ -32,11 +32,22 @@ module TaskQueue
         @busy = false
         @current_task.completed = true
         @current_task.completed.freeze # Sorry, you can't run this task again
+        @current_task.finished_successfully = true
+        @current_task.finished_successfully.freeze
       end
 
       begin
         # if we have an ensure block to run, run it now
-        @current_task.ensure_block.call if @current_task.ensure_block
+        unless @current_task.ensure_block.nil?
+          case @current_task.ensure_block.arity
+          when 0
+            @current_task.ensure_block.call
+          when 1
+            @current_task.ensure_block.call(@current_task.finished_successfully)
+          else
+            raise "Unexpected number of arguments in `ensure_block`, expected 0 or 1, got #{@current_task.ensure_block.arity}"
+          end
+        end
       rescue StandardError => e
         # Oh noes, our ensure block raised something
         puts("finish_task failed with exception: #{e.message}")

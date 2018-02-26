@@ -38,6 +38,33 @@ module TaskQueue
       expect(ensured).to be(true)
     end
 
+    it 'Reports success state when task completed without exceptions' do
+      queue = TaskQueue.new(name: 'test queue')
+      work_completed = false
+      success_task = false
+      task = Task.new(work_block: proc { work_completed = true }, ensure_block: proc { |success| success_task = true })
+      queue.add_task_async(task: task)
+      wait_for_task_to_complete(task: task)
+      expect(work_completed).to be(true)
+      expect(success_task).to be(true)
+      expect(task.finished_successfully).to be(true)
+    end
+
+    it 'Reports unsuccess state when task completed with exceptions' do
+      ensured = false
+      success_task = nil
+      expect {
+        queue = TaskQueue.new(name: 'test queue')
+        task = Task.new(work_block: proc { raise "Oh noes" }, ensure_block: proc { |success| ensured = true; success_task = success })
+        queue.add_task_async(task: task)
+        wait_for_task_to_complete(task: task)
+      }.to raise_error(RuntimeError, "Oh noes")
+
+      expect(ensured).to be(true)
+      expect(success_task).to be(false)
+      expect(task.finished_successfully).to be(false)
+    end
+
     it 'Executes 2 blocks of work with just 1 worker' do
       queue = TaskQueue.new(name: 'test queue')
 
