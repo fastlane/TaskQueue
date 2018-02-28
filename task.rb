@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require 'json'
+require_relative 'recreatable_task'
 
 module TaskQueue
   # Smallest unit of work that can be submitted to a TaskQueue
@@ -32,13 +33,13 @@ module TaskQueue
     end
 
     def self.from_recreatable_task!(file_path: nil)
-      raise 'Task file path was not provided' unless file_path.nil?
-      raise 'Task class was not provided' unless recreatable_subclass.nil?
+      raise 'Task file path was not provided' if file_path.nil?
+      raise 'Task class was not provided' if recreatable_subclass.nil?
 
       recreatable_task_hash = JSON.parse(File.read(file_path))
       recreatable_task = recreatable_task_hash['class'].constantize.new
 
-      raise 'Recreatable task does not include `RecreatableTask` module' unless recreatable_task.class.included_modules.include?(TaskQueue::RecreatableTask)
+      raise 'Recreatable task does not include `RecreatableTask` module' unless recreatable_task.class.include?(RecreatableTask)
 
       params = recreatable_task_hash['params']
 

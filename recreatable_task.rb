@@ -12,7 +12,7 @@ module TaskQueue
       # This method is the base execution unit for a given Task, it
       # receives a Hash-like parameter collection defined by the
       # `params_to_hash` resultant Hash.
-      def run!(*params)
+      def run!(params)
         # no-op
       end
 
@@ -29,7 +29,7 @@ module TaskQueue
         task = Task.new(work_block: proc { run!(params_to_hash) })
         task.recreatable = true
         task.recreatable.freeze # Avoid further mutations on this.
-        task.recreatable_class = self.class.constantize
+        task.recreatable_class = self.class
         task.recreatable_class.freeze
         task.recreatable_params = params_to_hash
         task.recreatable_params.freeze

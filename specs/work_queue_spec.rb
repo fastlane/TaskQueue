@@ -1,5 +1,17 @@
 require_relative '../task_queue'
 
+class MockRecreatableTask
+  include TaskQueue::RecreatableTask
+
+  def run!(params)
+    puts "#{params}"
+  end
+
+  def params_to_hash
+    { "one_param" => "Hello", "other_param" => "World" }
+  end
+end
+
 module TaskQueue
   describe TaskQueue do
     def wait_for_task_to_complete(task: nil)
@@ -155,6 +167,28 @@ module TaskQueue
 
       # expect that the arrays aren't equal because this was async
       expect(numbers).to_not eq(expected_results)
+    end
+
+    it 'Creates tasks from any RecreatableTask' do
+      recreatable_task = MockRecreatableTask.new
+      task = recreatable_task.to_task
+      expect(task).to_not be_nil
+    end
+
+    it 'Should execute tasks from RecreatableTasks' do
+      recreatable_task = MockRecreatableTask.new
+      task = recreatable_task.to_task
+      queue = TaskQueue.new(name: 'test queue')
+      expect(STDOUT).to receive(:puts).with(recreatable_task.params_to_hash.to_s)
+      queue.add_task_async(task: task)
+      wait_for_task_to_complete(task: task)
+    end
+
+    it 'Should call finalizer when the Queue is destroyed' do
+      # This is actually tricky to achieve, because even forcing
+      # garbage collection, the queue's finalizer is not getting
+      # called until the end of the program or the GC decides to
+      # release the object (calling GC.start does not trigger it).
     end
   end
 end

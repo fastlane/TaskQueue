@@ -1,15 +1,18 @@
 # frozen_string_literal: true
 
 require 'set'
-require_relative 'task'
-require_relative 'queue_worker'
 require 'tmpdir'
 require 'json'
+require 'pathname'
+require_relative 'task'
+require_relative 'queue_worker'
+require_relative 'recreatable_task'
 
 module TaskQueue
   # A queue that executes tasks in the order in which they were received
   class TaskQueue
     attr_reader :name
+    attr_reader :queue
 
     def initialize(name:, number_of_workers: 1)
       @name = name
@@ -24,7 +27,7 @@ module TaskQueue
         @available_workers.add(worker)
       end
 
-      ObjectSpace.define_finalizer(self, self.class.finalize(name: name, number_of_workers: number_of_workers, tasks: queue.to_a))
+      ObjectSpace.define_finalizer(self, proc { puts "deallocate"; self.class.finalizer(name: name, number_of_workers: number_of_workers, tasks: @queue) })
 
       start_task_distributor
     end
@@ -77,7 +80,7 @@ module TaskQueue
         loop do
           hand_out_work
           # only sleep if we have no workers or the queue is empty
-          Thread.stop if @available_workers.count == 0 || @queue.empty?
+          Thread.stop if @available_workers.count.zero? || @queue.empty?
         end
       end
 
@@ -109,17 +112,27 @@ module TaskQueue
 
     def self.finalizer(name: nil, number_of_workers: 1, tasks: nil)
       return if tasks.nil? || name.nil?
-      path = Pathname.new(Dir.tmpdir).join(name, 'meta.json')
-      File.write(path, JSON.pretty_generate('name' => name, 'number_of_workers' => number_of_workers))
-      to_a(tasks)
-        .select { |task| task.recreatable && !task.completed }
+      tasks = tasks.size.times.map { tasks.pop }
+      name = name.sub(' ', '_')
+      temp_dir = Pathname.new(Dir.tmpdir).join(name)
+      FileUtils.mkdir_p(temp_dir) unless File.directory?(temp_dir)
+      FileUtils.rm_rf("#{temp_dir}/.", secure: true)
+      meta_path = temp_dir.join('meta.json')
+      FileUtils.touch(meta_path)
+      File.write(meta_path, JSON.pretty_generate('name' => name, 'number_of_workers' => number_of_workers))
+      recreatable_tasks = tasks.select { |task| task.recreatable && !task.completed }
+      return if recreatable_tasks.count.zero?
+      recreatable_tasks
         .each_with_index do |task, index|
           task_meta = { 'class' => task.recreatable_class.name, 'params' => task.recreatable_params }
-          File.write(Pathname.new(Dir.tmpdir).join(name, "#{index}.json"), JSON.pretty_generate(task_meta))
+          FileUtils.touch(temp_dir.join("#{index}.json"))
+          File.write(temp_dir.join("#{index}.json"), JSON.pretty_generate(task_meta))
         end
     end
 
     def self.from_recreated_tasks(name: nil)
+      return nil if name.nil?
+      name = name.sub('_', ' ')
       path = Pathname.new(Dir.tmpdir).join(name, 'meta.json')
       queue_meta = JSON.parse(File.read(path))
       queue = TaskQueue.new(name: queue_meta['name'], number_of_workers: queue_meta['number_of_workers'])
@@ -128,12 +141,6 @@ module TaskQueue
         queue.add_task_async(task: Task.from_recreatable_task!(file_path: Pathname.new(Dir.tmpdir).join(name, json_file)))
       end
       queue
-    end
-
-    private
-
-    def to_a(queue)
-      queue.size.times.map { queue.pop }
     end
   end
 end
