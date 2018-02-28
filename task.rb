@@ -34,7 +34,6 @@ module TaskQueue
 
     def self.from_recreatable_task!(file_path: nil)
       raise 'Task file path was not provided' if file_path.nil?
-      raise 'Task class was not provided' if recreatable_subclass.nil?
 
       recreatable_task_hash = JSON.parse(File.read(file_path))
       recreatable_task = recreatable_task_hash['class'].constantize.new
