@@ -27,7 +27,7 @@ module TaskQueue
         @available_workers.add(worker)
       end
 
-      ObjectSpace.define_finalizer(self, proc { self.class.finalizer(name: name, number_of_workers: number_of_workers, tasks: @queue) })
+      ObjectSpace.define_finalizer(self, self.class.finalizer(name: name, number_of_workers: number_of_workers, tasks: @queue))
 
       start_task_distributor
     end
@@ -111,23 +111,25 @@ module TaskQueue
     end
 
     def self.finalizer(name: nil, number_of_workers: 1, tasks: nil)
-      return if tasks.nil? || name.nil?
-      tasks = tasks.size.times.map { tasks.pop }
-      name = name.sub(' ', '_')
-      temp_dir = Pathname.new(Dir.tmpdir).join(name)
-      FileUtils.mkdir_p(temp_dir) unless File.directory?(temp_dir)
-      FileUtils.rm_rf("#{temp_dir}/.", secure: true)
-      meta_path = temp_dir.join('meta.json')
-      FileUtils.touch(meta_path)
-      File.write(meta_path, JSON.pretty_generate('name' => name, 'number_of_workers' => number_of_workers))
-      recreatable_tasks = tasks.select { |task| task.recreatable && !task.completed }
-      return if recreatable_tasks.count.zero?
-      recreatable_tasks
-        .each_with_index do |task, index|
-          task_meta = { 'class' => task.recreatable_class.name, 'params' => task.recreatable_params }
-          FileUtils.touch(temp_dir.join("#{index}.json"))
-          File.write(temp_dir.join("#{index}.json"), JSON.pretty_generate(task_meta))
-        end
+      proc {
+        return if tasks.nil? || name.nil?
+        tasks = tasks.size.times.map { tasks.pop }
+        name = name.sub(' ', '_')
+        temp_dir = Pathname.new(Dir.tmpdir).join(name)
+        FileUtils.mkdir_p(temp_dir) unless File.directory?(temp_dir)
+        FileUtils.rm_rf("#{temp_dir}/.", secure: true)
+        meta_path = temp_dir.join('meta.json')
+        FileUtils.touch(meta_path)
+        File.write(meta_path, JSON.pretty_generate('name' => name, 'number_of_workers' => number_of_workers))
+        recreatable_tasks = tasks.select { |task| task.recreatable && !task.completed }
+        return if recreatable_tasks.count.zero?
+        recreatable_tasks
+          .each_with_index do |task, index|
+            task_meta = { 'class' => task.recreatable_class.name, 'params' => task.recreatable_params }
+            FileUtils.touch(temp_dir.join("#{index}.json"))
+            File.write(temp_dir.join("#{index}.json"), JSON.pretty_generate(task_meta))
+          end
+      }
     end
 
     def self.from_recreated_tasks(name: nil)

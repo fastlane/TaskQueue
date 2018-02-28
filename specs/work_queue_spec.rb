@@ -15,7 +15,7 @@ end
 module TaskQueue
   describe TaskQueue do
     def wait_for_task_to_complete(task: nil)
-      sleep 0.0001 until task.completed
+      sleep 0.001 until task.completed
     end
 
     it 'Executes one block of work with just 1 worker' do
@@ -45,7 +45,7 @@ module TaskQueue
         task = Task.new(work_block: proc { raise "Oh noes" }, ensure_block: proc { ensured = true })
         queue.add_task_async(task: task)
         wait_for_task_to_complete(task: task)
-      }.to raise_error(RuntimeError, "Oh noes")
+      }.to raise_error(RuntimeError)
 
       expect(ensured).to be(true)
     end
@@ -70,11 +70,12 @@ module TaskQueue
         task = Task.new(work_block: proc { raise "Oh noes" }, ensure_block: proc { |success| ensured = true; success_task = success })
         queue.add_task_async(task: task)
         wait_for_task_to_complete(task: task)
-      }.to raise_error(RuntimeError, "Oh noes")
+
+        expect(task.finished_successfully).to be(false)
+      }.to raise_error(RuntimeError)
 
       expect(ensured).to be(true)
       expect(success_task).to be(false)
-      expect(task.finished_successfully).to be(false)
     end
 
     it 'Executes 2 blocks of work with just 1 worker' do
@@ -183,12 +184,38 @@ module TaskQueue
       queue.add_task_async(task: task)
       wait_for_task_to_complete(task: task)
     end
+    context 'it should call its destructor' do
+      it 'Should call finalizer when the Queue is destroyed' do
+        # creating pipe for IPC to get result from child process
+        # after it garbaged
+        # http://ruby-doc.org/core-2.0.0/IO.html#method-c-pipe
+        rd, wr = IO.pipe
 
-    it 'Should call finalizer when the Queue is destroyed' do
-      # This is actually tricky to achieve, because even forcing
-      # garbage collection, the queue's finalizer is not getting
-      # called until the end of the program or the GC decides to
-      # release the object (calling GC.start does not trigger it).
+        # forking
+        # https://ruby-doc.org/core-2.1.2/Process.html#method-c-fork
+        if fork
+          wr.close
+          called = rd.read
+          Process.wait
+          expect(called).to eq({ 'name' => 'test queue', 'number_of_workers' => 1 }.to_s)
+          rd.close
+        else
+          rd.close
+          # overriding TaskQueue.finalizer(...)
+          TaskQueue.singleton_class.class_eval do
+            define_method(:finalizer) do |arg|
+              proc {
+                wr.write({ 'name' => arg[:name], 'number_of_workers' => arg[:number_of_workers] })
+                wr.close
+              }
+            end
+          end
+
+          queue = TaskQueue.new(name: 'test queue')
+          queue = nil
+          GC.start
+        end
+      end
     end
   end
 end

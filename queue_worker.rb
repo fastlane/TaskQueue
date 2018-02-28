@@ -32,8 +32,6 @@ module TaskQueue
         @busy = false
         @current_task.completed = true
         @current_task.completed.freeze # Sorry, you can't run this task again
-        @current_task.finished_successfully = true
-        @current_task.finished_successfully.freeze
       end
 
       begin
@@ -81,6 +79,10 @@ module TaskQueue
           @current_task.work_block = nil
 
           work_block.call
+
+          # If execution reaches this point, we can ensure that no exceptions were raised.
+          @current_task.finished_successfully = true
+          @current_task.finished_successfully.freeze
 
           # When work is done, set @busy to false so we can be assigned up a new work unit
           finish_task
