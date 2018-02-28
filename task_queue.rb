@@ -1,6 +1,10 @@
-require "set"
-require_relative "task"
-require_relative "queue_worker"
+# frozen_string_literal: true
+
+require 'set'
+require_relative 'task'
+require_relative 'queue_worker'
+require 'tmpdir'
+require 'json'
 
 module TaskQueue
   # A queue that executes tasks in the order in which they were received
@@ -19,6 +23,8 @@ module TaskQueue
         worker = QueueWorker.new(worker_delegate: self)
         @available_workers.add(worker)
       end
+
+      ObjectSpace.define_finalizer(self, self.class.finalize(name: name, number_of_workers: number_of_workers, tasks: queue.to_a))
 
       start_task_distributor
     end
@@ -49,7 +55,7 @@ module TaskQueue
 
     def hand_out_work
       # get first available worker
-      while (worker = self.available_worker)
+      while (worker = available_worker)
         # if none are available, that's cool.
         break if worker.nil?
 
@@ -99,6 +105,35 @@ module TaskQueue
       @worker_list_mutex.synchronize do
         return @busy_workers.count
       end
+    end
+
+    def self.finalizer(name: nil, number_of_workers: 1, tasks: nil)
+      return if tasks.nil? || name.nil?
+      path = Pathname.new(Dir.tmpdir).join(name, 'meta.json')
+      File.write(path, JSON.pretty_generate('name' => name, 'number_of_workers' => number_of_workers))
+      to_a(tasks)
+        .select { |task| task.recreatable && !task.completed }
+        .each_with_index do |task, index|
+          task_meta = { 'class' => task.recreatable_class.name, 'params' => task.recreatable_params }
+          File.write(Pathname.new(Dir.tmpdir).join(name, "#{index}.json"), JSON.pretty_generate(task_meta))
+        end
+    end
+
+    def self.from_recreated_tasks(name: nil)
+      path = Pathname.new(Dir.tmpdir).join(name, 'meta.json')
+      queue_meta = JSON.parse(File.read(path))
+      queue = TaskQueue.new(name: queue_meta['name'], number_of_workers: queue_meta['number_of_workers'])
+      Dir.glob(Dir.tmpdir.join(name, '*.json')).sort do |json_file|
+        next if File.basename(json_file).eql?('meta.json')
+        queue.add_task_async(task: Task.from_recreatable_task!(file_path: Pathname.new(Dir.tmpdir).join(name, json_file)))
+      end
+      queue
+    end
+
+    private
+
+    def to_a(queue)
+      queue.size.times.map { queue.pop }
     end
   end
 end
