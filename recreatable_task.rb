@@ -26,7 +26,7 @@ module TaskQueue
       end
 
       def to_task
-        task = Task.new(work_block: proc { recreatable_task.run!(params_to_hash) })
+        task = Task.new(work_block: proc { run!(params_to_hash) })
         task.recreatable = true
         task.recreatable.freeze # Avoid further mutations on this.
         task.recreatable_class = self.class.constantize
