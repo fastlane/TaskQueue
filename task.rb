@@ -47,7 +47,7 @@ module TaskQueue
       task = Task.new(work_block: proc { recreatable_task.run!(params) })
       task.recreatable = true
       task.recreatable.freeze # Avoid further mutations on this.
-      task.recreatable_class = recreatable_task.constantize
+      task.recreatable_class = recreatable_task.class
       task.recreatable_class.freeze
       task.recreatable_params = params
       task.recreatable_params.freeze
