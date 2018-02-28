@@ -27,7 +27,7 @@ module TaskQueue
         @available_workers.add(worker)
       end
 
-      ObjectSpace.define_finalizer(self, proc { puts "deallocate"; self.class.finalizer(name: name, number_of_workers: number_of_workers, tasks: @queue) })
+      ObjectSpace.define_finalizer(self, proc { self.class.finalizer(name: name, number_of_workers: number_of_workers, tasks: @queue) })
 
       start_task_distributor
     end
