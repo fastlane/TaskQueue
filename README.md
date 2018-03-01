@@ -26,7 +26,7 @@ task = Task.new(work_block: proc {
 queue.add_task_async(task: task)
 ```
 
-## Recreatable Tasks
+## Recreatable Tasks
 
 The tasks that are created from the mixin `RecreatableTask` can be recovered in future executions of the `TaskQueue` where their were enqueued originally.
 
