@@ -32,15 +32,20 @@ module TaskQueue
       self.finished_successfully = false
     end
 
+    # Factory method which allows, given a file_path containing
+    # the file with the required data to recreate the Task stored
+    # by a certain Queue.
+    # @param file_path: String
+    # @returns [Task]
     def self.from_recreatable_task!(file_path: nil)
       raise 'Task file path was not provided' if file_path.nil?
 
-      recreatable_task_hash = JSON.parse(File.read(file_path))
-      recreatable_task = recreatable_task_hash['class'].constantize.new
+      recreatable_task_hash = JSON.parse(File.read(file_path), symbolize_names: true)
+      recreatable_task = Object.const_get(recreatable_task_hash[:class]).new
 
       raise 'Recreatable task does not include `RecreatableTask` module' unless recreatable_task.class.include?(RecreatableTask)
 
-      params = recreatable_task_hash['params']
+      params = recreatable_task_hash[:params]
 
       raise "Unexpected parameter type, found #{params.class} expected Hash." unless params.is_a?(Hash)
 

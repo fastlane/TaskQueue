@@ -12,7 +12,7 @@ module TaskQueue
       # This method is the base execution unit for a given Task, it
       # receives a Hash-like parameter collection defined by the
       # `params_to_hash` resultant Hash.
-      def run!(params)
+      def run!(**params)
         # no-op
       end
 
@@ -25,6 +25,8 @@ module TaskQueue
         {}
       end
 
+      # This is a convenience operator to turn a RecreatableTask to a
+      # generic Task, in order to be correctly executed by any TaskQueue.
       def to_task
         task = Task.new(work_block: proc { run!(params_to_hash) })
         task.recreatable = true

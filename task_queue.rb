@@ -12,7 +12,6 @@ module TaskQueue
   # A queue that executes tasks in the order in which they were received
   class TaskQueue
     attr_reader :name
-    attr_reader :queue
 
     def initialize(name:, number_of_workers: 1)
       @name = name
@@ -114,32 +113,39 @@ module TaskQueue
       proc {
         return if tasks.nil? || name.nil?
         tasks = tasks.size.times.map { tasks.pop }
+        return if tasks.count.zero?
+        recreatable_tasks = tasks.select { |task| task.recreatable && !task.completed }
+        return if recreatable_tasks.count.zero?
         name = name.sub(' ', '_')
         temp_dir = Pathname.new(Dir.tmpdir).join(name)
         FileUtils.mkdir_p(temp_dir) unless File.directory?(temp_dir)
         FileUtils.rm_rf("#{temp_dir}/.", secure: true)
         meta_path = temp_dir.join('meta.json')
         FileUtils.touch(meta_path)
-        File.write(meta_path, JSON.pretty_generate('name' => name, 'number_of_workers' => number_of_workers))
-        recreatable_tasks = tasks.select { |task| task.recreatable && !task.completed }
-        return if recreatable_tasks.count.zero?
+        File.write(meta_path, JSON.pretty_generate(:name => name, :number_of_workers => number_of_workers))
         recreatable_tasks
           .each_with_index do |task, index|
-            task_meta = { 'class' => task.recreatable_class.name, 'params' => task.recreatable_params }
+            task_meta = { :class => task.recreatable_class.name, :params => task.recreatable_params }
             FileUtils.touch(temp_dir.join("#{index}.json"))
             File.write(temp_dir.join("#{index}.json"), JSON.pretty_generate(task_meta))
           end
       }
     end
 
-    def self.from_recreated_tasks(name: nil)
+    # Factory method.
+    # Creates a new TaskQueue given the name of the TaskQueue that was destroyed.
+    #
+    # @param name: String
+    # @returns [TaskQueue] with its recreatable tasks already added async.
+    def self.from_recreated_tasks!(name: nil)
       return nil if name.nil?
-      name = name.sub('_', ' ')
+      name = name.sub(' ', '_')
       path = Pathname.new(Dir.tmpdir).join(name, 'meta.json')
-      queue_meta = JSON.parse(File.read(path))
-      queue = TaskQueue.new(name: queue_meta['name'], number_of_workers: queue_meta['number_of_workers'])
-      Dir.glob(Dir.tmpdir.join(name, '*.json')).sort do |json_file|
-        next if File.basename(json_file).eql?('meta.json')
+      return unless File.file?(path)
+      queue_meta = JSON.parse(File.read(path), symbolize_names: true)
+      queue = TaskQueue.new(name: queue_meta[:name].sub('_', ' '), number_of_workers: queue_meta[:number_of_workers])
+      Dir[Pathname.new(Dir.tmpdir).join('test_queue', '*.json')].sort.each do |json_file|
+        next if File.basename(json_file).eql?('meta.json') # Skip meta file
         queue.add_task_async(task: Task.from_recreatable_task!(file_path: Pathname.new(Dir.tmpdir).join(name, json_file)))
       end
       queue

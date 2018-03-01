@@ -3,12 +3,29 @@ require_relative '../task_queue'
 class MockRecreatableTask
   include TaskQueue::RecreatableTask
 
-  def run!(params)
-    puts "#{params}"
+  def run!(**params)
+    puts params.to_s
   end
 
   def params_to_hash
-    { "one_param" => "Hello", "other_param" => "World" }
+    { one_param: "Hello", other_param: "World" }
+  end
+end
+
+class MockOrderedRecreatableTask
+  include TaskQueue::RecreatableTask
+
+  attr_accessor :number
+  def initialize(number: nil)
+    self.number = number
+  end
+
+  def run!(**params)
+    puts params.to_s
+  end
+
+  def params_to_hash
+    { one_param: "Hello", other_param: "World", number: number }
   end
 end
 
@@ -216,6 +233,124 @@ module TaskQueue
           GC.start
         end
       end
+    end
+
+    it 'Stores in JSON format the meta information of the queue' do
+      queue = TaskQueue.new(name: 'test queue')
+      tasks = Queue.new
+      # We need at least one pending task to let the queue be stored
+      tasks << MockRecreatableTask.new.to_task
+      allow(queue).to receive(:queue).and_return(tasks)
+      TaskQueue.finalizer(name: 'test queue', number_of_workers: 1, tasks: tasks).call
+      meta_path = Pathname.new(Dir.tmpdir).join('test_queue', 'meta.json')
+      expect(File.exist?(meta_path)).to eq(true)
+      queue_meta = JSON.parse(File.read(meta_path), symbolize_names: true)
+      expect(queue_meta).to eq({ name: 'test_queue', number_of_workers: 1 })
+
+      # Cleanup directory
+      FileUtils.rm_rf(Pathname.new(Dir.tmpdir).join('test_queue'), secure: true)
+    end
+
+    it 'Stores the correct number of pending tasks' do
+      queue = TaskQueue.new(name: 'test queue')
+      tasks = Queue.new
+      # We need at least one pending task to let the queue be stored
+      task_number = 10
+      task_number.times do
+        tasks << MockRecreatableTask.new.to_task
+      end
+
+      allow(queue).to receive(:queue).and_return(tasks)
+      TaskQueue.finalizer(name: 'test queue', number_of_workers: 1, tasks: tasks).call
+
+      file_count = Dir[Pathname.new(Dir.tmpdir).join('test_queue', '*.json')].select { |file| File.file?(file) }.count
+
+      expect(file_count).to eq(task_number + 1) # Task count plus meta file.
+
+      # Cleanup directory
+      FileUtils.rm_rf(Pathname.new(Dir.tmpdir).join('test_queue'), secure: true)
+    end
+
+    it 'Stores the correct information of pending tasks in order to recreate them' do
+      queue = TaskQueue.new(name: 'test queue')
+      tasks = Queue.new
+      # We need at least one pending task to let the queue be stored
+      tasks << MockRecreatableTask.new.to_task
+
+      allow(queue).to receive(:queue).and_return(tasks)
+      TaskQueue.finalizer(name: 'test queue', number_of_workers: 1, tasks: tasks).call
+      Dir[Pathname.new(Dir.tmpdir).join('test_queue', '*.json')].select { |file| File.file?(file) }.each do |json_file|
+        next if File.basename(json_file).eql?('meta.json') # Skip meta file
+        task_hash = JSON.parse(File.read(json_file), symbolize_names: true)
+        expect(task_hash).to eq({ class: MockRecreatableTask.to_s, params: { one_param: "Hello", other_param: "World" } })
+      end
+
+      # Cleanup directory
+      FileUtils.rm_rf(Pathname.new(Dir.tmpdir).join('test_queue'), secure: true)
+    end
+
+    it 'Recreates correctly the task from the information stored' do
+      queue = TaskQueue.new(name: 'test queue')
+      tasks = Queue.new
+      # We need at least one pending task to let the queue be stored
+      tasks << MockRecreatableTask.new.to_task
+
+      allow(queue).to receive(:queue).and_return(tasks)
+      TaskQueue.finalizer(name: 'test queue', number_of_workers: 1, tasks: tasks).call
+      Dir[Pathname.new(Dir.tmpdir).join('test_queue', '*.json')].select { |file| File.file?(file) }.each do |json_file|
+        next if File.basename(json_file).eql?('meta.json') # Skip meta file
+        recreatable_task = Task.from_recreatable_task!(file_path: json_file)
+        expect(recreatable_task.recreatable_class).to eq(MockRecreatableTask)
+        expect(recreatable_task.recreatable_params).to eq({ one_param: "Hello", other_param: "World" })
+      end
+
+      # Cleanup directory
+      FileUtils.rm_rf(Pathname.new(Dir.tmpdir).join('test_queue'), secure: true)
+    end
+
+    it 'Recreates the whole TaskQueue from the information stored' do
+      queue = TaskQueue.new(name: 'test queue')
+      tasks = Queue.new
+      # We need at least one pending task to let the queue be stored
+      task_number = 2
+      task_number.times do
+        tasks << MockRecreatableTask.new.to_task
+      end
+
+      allow(queue).to receive(:queue).and_return(tasks)
+      TaskQueue.finalizer(name: 'test queue', number_of_workers: 1, tasks: tasks).call
+
+      expect(STDOUT).to receive(:puts).with({ one_param: "Hello", other_param: "World" }.to_s).twice
+      recreated_queue = TaskQueue.from_recreated_tasks!(name: 'test queue')
+      sleep 0.001 until recreated_queue.task_count.zero?
+      expect(recreated_queue.name).to eq('test queue')
+
+      # Cleanup directory
+      FileUtils.rm_rf(Pathname.new(Dir.tmpdir).join('test_queue'), secure: true)
+    end
+
+    it 'Recreates the whole TaskQueue from the information stored in the correct order' do
+      queue = TaskQueue.new(name: 'test queue')
+      tasks = Queue.new
+      # We need at least one pending task to let the queue be stored
+      task_number = 4
+      task_number.times do |i|
+        tasks << MockOrderedRecreatableTask.new(number: i).to_task
+      end
+
+      allow(queue).to receive(:queue).and_return(tasks)
+      TaskQueue.finalizer(name: 'test queue', number_of_workers: 1, tasks: tasks).call
+
+      task_number.times do |i|
+        expect(STDOUT).to receive(:puts).with({ one_param: "Hello", other_param: "World", number: i }.to_s)
+      end
+
+      recreated_queue = TaskQueue.from_recreated_tasks!(name: 'test queue')
+      sleep 0.001 until recreated_queue.task_count.zero?
+      expect(recreated_queue.name).to eq('test queue')
+
+      # Cleanup directory
+      FileUtils.rm_rf(Pathname.new(Dir.tmpdir).join('test_queue'), secure: true)
     end
   end
 end
