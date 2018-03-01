@@ -26,6 +26,34 @@ task = Task.new(work_block: proc {
 queue.add_task_async(task: task)
 ```
 
+## Recreatable Tasks
+
+The tasks that are created from the mixin `RecreatableTask` can be recovered in future executions of the `TaskQueue` where their were enqueued originally.
+
+### Example
+
+```ruby
+# We define a task that includes RecreatableTask
+class HelloToRecreatableTask
+  include TaskQueue::RecreatableTask
+
+  # The run! method receives a collection of params and defines the real execution of the task itself.
+  def run!(**params)
+    puts "Hello #{params}"
+  end
+
+  # In case the queue gets deallocated with RecreatableTasks on its queue, the hash returned by this function will be stored. Make sure that all values are JSON encodable.
+  def params_to_hash
+    { to: "fastlane" }
+  end
+end
+
+queue = TaskQueue(name: 'test queue')
+task = HelloToRecreatableTask.new.to_task
+queue.add_task_async(task: task)
+
+```
+
 ## Run tests
 
 ```
