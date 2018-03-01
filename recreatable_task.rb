@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module TaskQueue
   # Mixin included by Tasks that may be recreated from a file.
   module RecreatableTask

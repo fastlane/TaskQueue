@@ -1,12 +1,10 @@
-# frozen_string_literal: true
-
-require 'set'
-require 'tmpdir'
-require 'json'
-require 'pathname'
-require_relative 'task'
-require_relative 'queue_worker'
-require_relative 'recreatable_task'
+require "set"
+require "tmpdir"
+require "json"
+require "pathname"
+require_relative "task"
+require_relative "queue_worker"
+require_relative "recreatable_task"
 
 module TaskQueue
   # A queue that executes tasks in the order in which they were received

@@ -1,4 +1,5 @@
 require "securerandom"
+
 module TaskQueue
   # Class responsible for executing a single task
   # Designed to live as long as the owning queue lives

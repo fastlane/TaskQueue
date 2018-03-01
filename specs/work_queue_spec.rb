@@ -1,4 +1,4 @@
-require_relative '../task_queue'
+require_relative "../task_queue"
 
 class MockRecreatableTask
   include TaskQueue::RecreatableTask

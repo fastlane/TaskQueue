@@ -1,6 +1,5 @@
-# frozen_string_literal: true
-require 'json'
-require_relative 'recreatable_task'
+require "json"
+require_relative "recreatable_task"
 
 module TaskQueue
   # Smallest unit of work that can be submitted to a TaskQueue
